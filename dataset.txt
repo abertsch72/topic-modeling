@@ -1,0 +1,4 @@
+look at 20Newsgroups dataset: in sklearn
+
+https://towardsdatascience.com/nlp-extracting-the-main-topics-from-your-dataset-using-lda-in-minutes-21486f5aa925
+http://qwone.com/~jason/20Newsgroups/
