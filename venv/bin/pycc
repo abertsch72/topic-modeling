@@ -1,0 +1,3 @@
+#!/home/abertsch/projects/topic-modeling496t/venv/bin/python
+from numba.pycc import main
+main()
