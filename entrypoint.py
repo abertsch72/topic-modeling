@@ -11,6 +11,7 @@ import time
 import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.decomposition import NMF
+import random
 
 NUM_TOPICS = 6
 
@@ -92,15 +93,13 @@ def find_top_n(result, n):
     return top
 
 
-def permute_labels(results, perm=1):
-    for i in range(len(results)):
-        if (type(results[i]) == int):
-            results[i] = (results[i] + perm) % 6
-        else:
-            for j in range(len(results[i])):
-                results[i][j] = (results[i][j] + perm) % 6
-    return results
-
+def weighted_avg(points, weights):
+    num = 0
+    denom = 0
+    for i in range(len(points)):
+        num += points[i] * weights[i]
+        denom += weights[i]
+    return (num / denom)
 
 def validate_firm(results, correct, num_each):
     results = find_top_n(results, 1)
@@ -133,9 +132,11 @@ def validate_firm(results, correct, num_each):
     print("STRICT VALIDATION: RESULTS")
     print("Accuracy: " + str(max(accuracy)))
     m = accuracy.index(max(accuracy))
-    print("Average Precision (detailed on next line): " + str(sum(precision[m])/NUM_TOPICS))
+    print("Average Precision (detailed on next line): " +
+          str(weighted_avg(precision[m], num_each)))
     print(precision[m])
-    print("Average Recall (detailed on next line): " + str(sum(recall[m])/NUM_TOPICS))
+    print("Average Recall (detailed on next line): " +
+          str(weighted_avg(recall[m], num_each)))
     print(recall[m])
 
 
@@ -171,14 +172,18 @@ def validate_lax(results, correct, num_each):
     print("LAX (TOP 2) VALIDATION: RESULTS")
     print("Accuracy: " + str(max(accuracy)))
     m = accuracy.index(max(accuracy))
-    print("Average Precision (detailed on next line): " + str(sum(precision[m])/NUM_TOPICS))
+    print("Average Precision (detailed on next line): " +
+          str(weighted_avg(precision[m], num_each)))
     print(precision[m])
-    print("Average Recall (detailed on next line): " + str(sum(recall[m])/NUM_TOPICS))
+    print("Average Recall (detailed on next line): " +
+          str(weighted_avg(recall[m], num_each)))
     print(recall[m])
+
 
 def run_validate_SVD(vectorizer, data, correct_labels, num_each):
     time_start = time.time()
-    svd_model = TruncatedSVD(n_components=6, algorithm='randomized', n_iter=100, random_state=122)
+    svd_model = TruncatedSVD(n_components=6, algorithm='randomized', n_iter=100,
+                             random_state=122)
     results = svd_model.fit_transform(data)
     time_end = time.time()
 
@@ -272,25 +277,46 @@ def run_validate_CUR(vectorizer, data, correct_labels, num_each):
     print("\n\n\n")
 
 
+def run_validate_random(vectorizer, data, correct_labels, num_each):
+    random.seed(122)
+    time_start = time.time()
+    rand_result = [[random.random(), random.random(), random.random(), random.random(),
+                    random.random(), random.random()] for i in range(data.shape[0])]
+    print(rand_result)
+    time_end = time.time()
+
+    print("RANDOM GUESSING RESULTS: \n" + "-" * 70)
+    validate_lax(rand_result, correct_labels, num_each)
+    validate_firm(rand_result, correct_labels, num_each)
+    print("*" * 70)
+    print("TIME TAKEN: " + str(time_end - time_start) + " milliseconds")
+    print("\n\n\n")
+
+
 def entrypoint():
-    newsgroups = fetch_20newsgroups(shuffle=True, remove=('headers', 'footers', 'quotes'), random_state=1)
+    newsgroups = fetch_20newsgroups(subset='all', shuffle=True, remove=('headers',
+                                        'footers', 'quotes'), random_state=1)
     num_each, correct_labels = find_num_in_each_cat(newsgroups.target)
 
     # clean data
     clean = clean_data(newsgroups.data)
+    print(len(clean))
 
-    vectorizer = TfidfVectorizer(stop_words='english', max_df=0.5, smooth_idf=True, max_features=1000)
+    vectorizer = TfidfVectorizer(stop_words='english', max_df=0.5, smooth_idf=True,
+                                max_features=1000)
     X = vectorizer.fit_transform(clean)
     run_validate_SVD(vectorizer, X, correct_labels, num_each)
     run_validate_NMF(vectorizer, X, correct_labels, num_each)
     run_validate_CUR(vectorizer, X, correct_labels, num_each)
     run_validate_slowCUR(vectorizer, X, correct_labels, num_each)
+    run_validate_random(vectorizer, X, correct_labels, num_each)
     """
     import umap 
     import matplotlib.pyplot as plt
     
     X_topics = svd_model.fit_transform(X)
-    embedding = umap.UMAP(n_neighbors=150, min_dist=0.5, random_state=12).fit_transform(X_topics)
+    embedding = 
+    umap.UMAP(n_neighbors=150, min_dist=0.5, random_state=12).fit_transform(X_topics)
 
     plt.figure(figsize=(7, 5))
     plt.scatter(embedding[:, 0], embedding[:, 1],
@@ -303,7 +329,6 @@ def entrypoint():
 
 
 def clean_data(raw):
-    # adapted from https://www.analyticsvidhya.com/blog/2018/10/stepwise-guide-topic-modeling-latent-semantic-analysis/
 
     stop_words = stopwords.words('english')
     dictionary = set(words.words())
@@ -312,7 +337,8 @@ def clean_data(raw):
         item = re.sub("[^a-zA-Z#]", " ", item)
         item = item.lower()
         clean_data.append(
-            ' '.join([w for w in item.split() if (len(w) > 3 and w not in stop_words and w in dictionary)]))
+            ' '.join([w for w in item.split() if (len(w) > 3 and
+                                w not in stop_words and w in dictionary)]))
 
     return clean_data
 
