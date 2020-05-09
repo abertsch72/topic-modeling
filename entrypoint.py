@@ -1,21 +1,26 @@
-import nltk
+"""
+author: Amanda Bertsch
+"""
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
-import pandas as pd
-import re
-from nltk.corpus import stopwords
-from nltk.corpus import words
-import itertools
-import cur
-import time
-import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.decomposition import NMF
+from nltk.corpus import stopwords
+from nltk.corpus import words
+import cur
+import numpy as np
+
+import itertools
+import time
+import re
 import random
 
 NUM_TOPICS = 6
 
 
+"""
+Helper function to perform column selection for "slow CUR"
+"""
 def col_select(num, arr):
     cols_chosen = []
     cols_chosen.append(np.random.randint(0, arr.shape[1]))
@@ -28,6 +33,10 @@ def col_select(num, arr):
             c = np.column_stack([c, col])
     return c
 
+
+"""
+Performs "slow CUR" and fits the data to reduce dimensionality
+"""
 def CUR_fit_transform(data, k):
     c = col_select(k, data)
     r = np.transpose(col_select(k, np.transpose(data)))
@@ -35,13 +44,11 @@ def CUR_fit_transform(data, k):
     a = c @ np.linalg.pinv(u) @ r
     return c, u, r
 
-def sum_cat(data):
-    num_each = [0, 0, 0, 0, 0, 0]
-    for i in range(len(data)):
-        num_each[data[i]] += 1
-    return num_each
 
-
+"""
+For the canonical labels, sort into categories. Alter the category 
+descriptions here to change the topic groupings
+"""
 def find_num_in_each_cat(data):
     computers = [1, 2, 3, 4, 5]
     recreation = [7, 8, 9, 10]
@@ -76,6 +83,10 @@ def find_num_in_each_cat(data):
     return num_each, correct
 
 
+"""
+Finds the top n weights for each document, returning a matrix
+of the corresponding topic numbers
+"""
 def find_top_n(result, n):
     top = []
 
@@ -93,14 +104,23 @@ def find_top_n(result, n):
     return top
 
 
+"""
+Helper function to calulate a weighted average
+"""
 def weighted_avg(points, weights):
     num = 0
     denom = 0
     for i in range(len(points)):
         num += points[i] * weights[i]
         denom += weights[i]
-    return (num / denom)
+    return num / denom
 
+
+"""
+Calculates and prints accuracy, precision, and recall information for the 
+case where the topic label is considered correct if it is the top label 
+by weight
+"""
 def validate_firm(results, correct, num_each):
     results = find_top_n(results, 1)
     results = [r[0] for r in results]
@@ -140,6 +160,11 @@ def validate_firm(results, correct, num_each):
     print(recall[m])
 
 
+"""
+Calculates and prints accuracy, precision, and recall information for the 
+case where the topic label is considered correct if it is in the top 2 
+labels by weight
+"""
 def validate_lax(results, correct, num_each):
     results = find_top_n(results, 2)
 
@@ -180,6 +205,9 @@ def validate_lax(results, correct, num_each):
     print(recall[m])
 
 
+"""
+Uses SVD to reduce dimensionality of matrix and prints validation and timing data
+"""
 def run_validate_SVD(vectorizer, data, correct_labels, num_each):
     time_start = time.time()
     svd_model = TruncatedSVD(n_components=6, algorithm='randomized', n_iter=100,
@@ -205,6 +233,9 @@ def run_validate_SVD(vectorizer, data, correct_labels, num_each):
     print("\n\n\n")
 
 
+"""
+Uses NMF to reduce dimensionality of matrix and prints validation and timing data
+"""
 def run_validate_NMF(vectorizer, data, correct_labels, num_each):
     time_start = time.time()
     nmf_model = NMF(n_components=6, max_iter=100, random_state=122)
@@ -229,6 +260,10 @@ def run_validate_NMF(vectorizer, data, correct_labels, num_each):
     print("\n\n\n")
 
 
+"""
+Uses "slow CUR" to reduce dimensionality of matrix and prints validation and 
+timing data
+"""
 def run_validate_slowCUR(vectorizer, data, correct_labels, num_each):
     time_start = time.time()
     c, u, r = CUR_fit_transform(data.toarray(), NUM_TOPICS)
@@ -253,6 +288,9 @@ def run_validate_slowCUR(vectorizer, data, correct_labels, num_each):
     print("\n\n\n")
 
 
+"""
+Uses CUR to reduce dimensionality of matrix and prints validation and timing data
+"""
 def run_validate_CUR(vectorizer, data, correct_labels, num_each):
     time_start = time.time()
     C, U, R = cur.cur_decomposition(data.toarray(), NUM_TOPICS)
@@ -276,7 +314,9 @@ def run_validate_CUR(vectorizer, data, correct_labels, num_each):
         print("")
     print("\n\n\n")
 
-
+"""
+Chooses random values for each weight and prints validation and timing data
+"""
 def run_validate_random(vectorizer, data, correct_labels, num_each):
     random.seed(122)
     time_start = time.time()
@@ -293,6 +333,9 @@ def run_validate_random(vectorizer, data, correct_labels, num_each):
     print("\n\n\n")
 
 
+"""
+Gets and prepares data, then passes it to each method to run and analyze in turn
+"""
 def entrypoint():
     newsgroups = fetch_20newsgroups(subset='all', shuffle=True, remove=('headers',
                                         'footers', 'quotes'), random_state=1)
@@ -302,14 +345,19 @@ def entrypoint():
     clean = clean_data(newsgroups.data)
     print(len(clean))
 
+    # construct document-term matrix
     vectorizer = TfidfVectorizer(stop_words='english', max_df=0.5, smooth_idf=True,
                                 max_features=1000)
     X = vectorizer.fit_transform(clean)
+
+    # LSA with each dimesionality reduction strategy
     run_validate_SVD(vectorizer, X, correct_labels, num_each)
     run_validate_NMF(vectorizer, X, correct_labels, num_each)
     run_validate_CUR(vectorizer, X, correct_labels, num_each)
     run_validate_slowCUR(vectorizer, X, correct_labels, num_each)
     run_validate_random(vectorizer, X, correct_labels, num_each)
+
+    # uncomment this to produce a graph of topics, color-coded
     """
     import umap 
     import matplotlib.pyplot as plt
@@ -328,8 +376,12 @@ def entrypoint():
     """
 
 
+"""
+Clean data by removing non-alphabetic characters, making letters lowercase, 
+and removing stopwords, words less than 3 characters long, and words not
+in the English dictionary
+"""
 def clean_data(raw):
-
     stop_words = stopwords.words('english')
     dictionary = set(words.words())
     clean_data = []
