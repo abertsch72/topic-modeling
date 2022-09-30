@@ -1,7 +1,7 @@
 click==7.1.2
 cur==0.0.1
 cycler==0.10.0
-joblib==0.14.1
+joblib==1.2.0
 kiwisolver==1.2.0
 llvmlite==0.32.0
 matplotlib==3.2.1
